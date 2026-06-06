@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Coin Dodger Game</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      color: white;
+    }
+    #score {
+      font-size: 24px;
+      margin: 20px 0;
+    }
+    #gameCanvas {
+      background-color: black;
+      display: block;
+      margin: 0 auto;
+      border: 2px solid white;
+    }
+    #restartBtn {
+      background-color: rgb(133, 224, 133);
+      display: none;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #gameOverScreen {
+      display: none;
+      color: red;
+      font-size: 28px;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas" width="500" height="600"></canvas>
+  <div id="gameOverScreen">
+    <p>💀 Game Over 💀</p>
+    <p id="finalScore"></p>
+  </div>
+  <button id="restartBtn">Restart</button>
+  
+  <style>
+    #score {
+      font-size: 26px;
+      font-weight: bold;
+      color: #f1c40f;
+      margin: 20px 0;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+      animation: popIn 0.6s ease;
+    }
+  
+    #gameCanvas {
+      background: linear-gradient(to bottom, #000000, #1a1a1a);
+      display: block;
+      margin: 0 auto;
+      border: 3px solid #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 0 25px #f39c12;
+      transition: box-shadow 0.3s ease;
+    }
+  
+    #gameCanvas:hover {
+      box-shadow: 0 0 35px #e67e22;
+    }
+  
+    #gameOverScreen {
+      display: none;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 25px 20px;
+      margin: 20px auto;
+      width: 280px;
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+      animation: fadeIn 1s ease-in-out;
+    }
+  
+    #gameOverScreen p {
+      font-size: 22px;
+      margin: 10px 0;
+      color: #f8d7da;
+      font-weight: bold;
+    }
+  
+    #finalScore {
+      color: #f1c40f;
+      font-size: 20px;
+    }
+  
+    #restartBtn {
+      margin-top: 20px;
+      padding: 12px 24px;
+      font-size: 18px;
+      border: none;
+      background: linear-gradient(to right, #e74c3c, #c0392b);
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(255, 0, 0, 0.4);
+      transition: background 0.3s ease, transform 0.2s ease;
+      display: none;
+    }
+  
+    #restartBtn:hover {
+      background: linear-gradient(to right, #ff6f61, #c0392b);
+      transform: scale(1.05);
+    }
+  
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+  
+
+  <!-- Sound effects -->
+  <audio id="coinSound" src="button-305770.mp3"></audio>
+  <audio id="bombSound" src="large-underwater-explosion-190270.mp3"></audio>
+  <audio id="gameOverSound" src="game-over-80141.mp3"></audio>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score");
+    const restartBtn = document.getElementById("restartBtn");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const finalScore = document.getElementById("finalScore");
+
+    const coinSound = document.getElementById("coinSound");
+    const bombSound = document.getElementById("bombSound");
+    const gameOverSound = document.getElementById("gameOverSound");
+
+    let player = {
+      x: 225,
+      y: 550,
+      width: 50,
+      height: 10,
+      speed: 6,
+      color: "lime"
+    };
+
+    let obstacles = [];
+    let coins = [];
+    let bombs = [];
+
+    let obstacleSpeed = 3;
+    let coinSpeed = 2;
+    let bombSpeed = 3;
+
+    let obstacleSpawnRate = 100;
+    let coinSpawnRate = 150;
+    let bombSpawnRate = 300;
+
+    let frameCount = 0;
+    let score = 0;
+    let gameOver = false;
+
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+
+    function drawObstacles() {
+      ctx.fillStyle = "red";
+      obstacles.forEach(obj => {
+        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+      });
+    }
+
+    function drawCoins() {
+      ctx.fillStyle = "gold";
+      coins.forEach(coin => {
+        ctx.beginPath();
+        ctx.arc(coin.x + coin.radius, coin.y + coin.radius, coin.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawBombs() {
+      bombs.forEach(bomb => {
+        ctx.beginPath();
+        ctx.arc(bomb.x + bomb.radius, bomb.y + bomb.radius, bomb.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(bomb.x + bomb.radius, bomb.y + bomb.radius);
+        ctx.lineTo(bomb.x + bomb.radius, bomb.y + bomb.radius - 10);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    function updateObstacles() {
+      obstacles.forEach(obj => obj.y += obstacleSpeed);
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (obstacles[i].y > canvas.height) obstacles.splice(i, 1);
+      }
+      if (frameCount % obstacleSpawnRate === 0) {
+        obstacles.push({ x: Math.random() * (canvas.width - 30), y: 0, width: 30, height: 30 });
+      }
+    }
+
+    function updateCoins() {
+      coins.forEach(coin => coin.y += coinSpeed);
+      for (let i = coins.length - 1; i >= 0; i--) {
+        const c = coins[i];
+        if (
+          player.x < c.x + c.radius * 2 &&
+          player.x + player.width > c.x &&
+          player.y < c.y + c.radius * 2 &&
+          player.y + player.height > c.y
+        ) {
+          score += 5;
+          coinSound.currentTime = 0;
+          coinSound.play();
+          coins.splice(i, 1);
+        } else if (c.y > canvas.height) {
+          coins.splice(i, 1);
+        }
+      }
+      if (frameCount % coinSpawnRate === 0) {
+        coins.push({ x: Math.random() * (canvas.width - 20), y: 0, radius: 10 });
+      }
+    }
+
+    function updateBombs() {
+      bombs.forEach(bomb => bomb.y += bombSpeed);
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        const b = bombs[i];
+        if (
+          player.x < b.x + b.radius * 2 &&
+          player.x + player.width > b.x &&
+          player.y < b.y + b.radius * 2 &&
+          player.y + player.height > b.y
+        ) {
+          bombSound.currentTime = 0;
+          bombSound.play();
+          triggerGameOver();
+        } else if (b.y > canvas.height) {
+          bombs.splice(i, 1);
+        }
+      }
+      if (frameCount % bombSpawnRate === 0) {
+        bombs.push({ x: Math.random() * (canvas.width - 20), y: 0, radius: 12 });
+      }
+    }
+
+    function checkCollision() {
+      obstacles.forEach(obj => {
+        if (
+          player.x < obj.x + obj.width &&
+          player.x + player.width > obj.x &&
+          player.y < obj.y + obj.height &&
+          player.y + player.height > obj.y
+        ) {
+          triggerGameOver();
+        }
+      });
+    }
+
+    function triggerGameOver() {
+      gameOver = true;
+      gameOverSound.play();
+      canvas.style.display = "none";
+      gameOverScreen.style.display = "block";
+      finalScore.textContent = `Final Score: ${score}`;
+      restartBtn.style.display = "inline-block";
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function updatePlayerPosition(event) {
+      if (event.key === "ArrowLeft" && player.x > 0) {
+        player.x -= player.speed;
+      } else if (event.key === "ArrowRight" && player.x < canvas.width - player.width) {
+        player.x += player.speed;
+      }
+    }
+
+    function gameLoop() {
+      if (gameOver) return;
+
+      frameCount++;
+      clearCanvas();
+      drawPlayer();
+      drawObstacles();
+      drawCoins();
+      drawBombs();
+      updateObstacles();
+      updateCoins();
+      updateBombs();
+      checkCollision();
+
+      scoreDisplay.innerText = `Score: ${score}`;
+
+      if (frameCount % 500 === 0) {
+        obstacleSpeed += 0.3;
+        coinSpeed += 0.2;
+        bombSpeed += 0.2;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    restartBtn.addEventListener("click", () => {
+      // Reset everything
+      player.x = 225;
+      obstacles = [];
+      coins = [];
+      bombs = [];
+      score = 0;
+      obstacleSpeed = 3;
+      coinSpeed = 2;
+      bombSpeed = 3;
+      frameCount = 0;
+      gameOver = false;
+      canvas.style.display = "block";
+      gameOverScreen.style.display = "none";
+      restartBtn.style.display = "none";
+      gameLoop();
+    });
+
+    document.addEventListener("keydown", updatePlayerPosition);
+    gameLoop();
+  </script>
+</body>
+</html>
